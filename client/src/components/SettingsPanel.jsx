@@ -8,12 +8,11 @@ export const SettingsPanel = ({ status, onSave }) => {
     const [failRate, setFailRate] = useState(0.05);
 
     useEffect(() => {
-        if (status && !url) {
-            // Init state from status if available (tho status doesn't echo URL for security usually, but we check configured)
-            // fail_rate is public in status
+        if (isOpen && status) {
+            if (status.webhook_configured) setUrl("Configured (Hidden)"); // Or keep empty if security
             if (status.fail_rate !== undefined) setFailRate(status.fail_rate);
         }
-    }, [status, url]);
+    }, [isOpen]); // Only run when opening
 
     const handleSave = () => {
         onSave(url, apiKey, failRate).then(success => {

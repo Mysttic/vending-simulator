@@ -6,7 +6,7 @@ import { SettingsPanel } from './SettingsPanel';
 
 export const VendingMachine = () => {
     const {
-        inventory,
+        layout,
         status,
         balance,
         message,
@@ -18,13 +18,8 @@ export const VendingMachine = () => {
         clearDispensedItem
     } = useMachine();
 
-    // Group inventory by rows (1, 2, 3)
-    const rows = ['1', '2', '3'];
-    const getRowItems = (rowPrefix) => inventory.filter(i => i.id.startsWith(rowPrefix));
-
     return (
         <div className="min-h-screen bg-gray-950 flex items-center justify-center p-8 relative">
-            {/* Settings Button moved to absolutely top-right via CSS in component itself */}
             <SettingsPanel status={status} onSave={updateConfig} />
 
             {/* Machine Cabinet */}
@@ -33,7 +28,7 @@ export const VendingMachine = () => {
                 {/* Top Logo Panel */}
                 <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-r from-blue-900 to-purple-900 rounded-t-xl z-0 mx-4 mt-3 flex items-center justify-center shadow-lg border-b border-white/10">
                     <h1 className="text-2xl font-black text-white tracking-widest uppercase italic drop-shadow-md opacity-90">
-                        SNACK <span className="text-blue-400">TRON</span> <span className="text-xs align-top font-normal bg-white/20 px-1 rounded ml-1">v1.2</span>
+                        SNACK <span className="text-blue-400">TRON</span> <span className="text-xs align-top font-normal bg-white/20 px-1 rounded ml-1">v2.0</span>
                     </h1>
                 </div>
 
@@ -43,13 +38,21 @@ export const VendingMachine = () => {
                     <div className="absolute -top-20 -left-20 w-96 h-96 bg-gradient-to-br from-white/5 to-transparent rotate-45 pointer-events-none z-10"></div>
 
                     <div className="flex flex-col gap-6 relative z-0">
-                        {rows.map(row => (
-                            <div key={row} className="flex justify-center gap-4">
-                                {getRowItems(row).map(slot => (
-                                    <Shelf key={slot.id} slot={slot} onSelect={selectItem} />
+                        {/* Dynamic Rows */}
+                        {layout ? layout.rows.map(row => (
+                            <div key={row.id} className="flex justify-center gap-4">
+                                {row.slots.map(slot => (
+                                    <Shelf
+                                        key={slot.id}
+                                        slot={slot}
+                                        height={row.height}
+                                        onSelect={selectItem}
+                                    />
                                 ))}
                             </div>
-                        ))}
+                        )) : (
+                            <div className="text-white">Loading Layout...</div>
+                        )}
                     </div>
                 </div>
 

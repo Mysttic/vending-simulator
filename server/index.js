@@ -17,6 +17,7 @@ app.use((req, res, next) => {
 
 // API Routes
 app.get('/api/v1/inventory', apiController.getInventory);
+app.get('/api/v1/layout', apiController.getLayout);
 app.get('/api/v1/status', apiController.getStatus);
 app.post('/api/v1/config', apiController.updateConfiguration);
 

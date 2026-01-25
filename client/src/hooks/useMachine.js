@@ -5,7 +5,7 @@ import { useLogs } from '../contexts/LogContext';
 const API_URL = 'http://localhost:3000/api/v1';
 
 export const useMachine = () => {
-    const [inventory, setInventory] = useState([]);
+    const [layout, setLayout] = useState(null);
     const [status, setStatus] = useState(null);
     const [balance, setBalance] = useState(0);
     const [message, setMessage] = useState("Welcome");
@@ -13,47 +13,132 @@ export const useMachine = () => {
     const [dispensedItem, setDispensedItem] = useState(null);
 
     const { addLog } = useLogs();
+
+    // Track previous state to detect changes
     const lastStatusRef = useRef(null);
+    const lastInventoryRef = useRef({});
+    // Track pending purchase to know what we are waiting for
+    const pendingSlotIdRef = useRef(null);
+
+    // Fetch Layout Once on Start (or reload)
+    useEffect(() => {
+        const fetchLayout = async () => {
+            try {
+                const res = await axios.get(`${API_URL}/layout`);
+                setLayout(res.data);
+
+                // Init inventory ref
+                res.data.rows.forEach(r => {
+                    r.slots.forEach(s => {
+                        lastInventoryRef.current[s.id] = s.count;
+                    });
+                });
+
+                addLog('API_RES', 'Layout Loaded');
+            } catch (err) {
+                addLog('ERROR', 'Failed to load layout');
+            }
+        };
+        fetchLayout();
+    }, [addLog]);
 
     // Polling State
     const refreshState = useCallback(async () => {
         try {
-            const [invRes, statusRes] = await Promise.all([
-                axios.get(`${API_URL}/inventory`),
+            const [layoutRes, statusRes] = await Promise.all([
+                axios.get(`${API_URL}/layout`),
                 axios.get(`${API_URL}/status`)
             ]);
-            setInventory(invRes.data.data);
-            setStatus(statusRes.data);
 
-            if (statusRes.data.balance !== undefined) {
-                setBalance(statusRes.data.balance);
-            }
+            const newLayout = layoutRes.data;
+            const newStatus = statusRes.data;
+            const machineStatus = newStatus.status;
 
-            const machineStatus = statusRes.data.status;
+            setLayout(newLayout);
+            setStatus(newStatus);
+            if (newStatus.balance !== undefined) setBalance(newStatus.balance);
 
-            // Log Status Changes
+            // 1. Detect Status Changes
             if (lastStatusRef.current !== machineStatus) {
                 addLog('EVENT', `Machine State: ${machineStatus}`);
+
+                // 2. Logic when finishing VENDING -> IDLE
+                if (lastStatusRef.current === 'VENDING' && machineStatus === 'IDLE') {
+                    setLoading(false);
+
+                    // Check if inventory dropped for the pending slot
+                    const targetId = pendingSlotIdRef.current;
+                    if (targetId) {
+                        // Find new count
+                        let newCount = 0;
+                        let oldCount = lastInventoryRef.current[targetId];
+
+                        // Locate in new layout
+                        newLayout.rows.forEach(r => {
+                            const s = r.slots.find(x => x.id === targetId);
+                            if (s) newCount = s.count;
+                        });
+
+                        addLog('INFO', `Verifying Dispense: Slot ${targetId} (Qty: ${oldCount} -> ${newCount})`);
+
+                        if (newCount < oldCount) {
+                            // SUCCESS: Item dropped
+                            addLog('EVENT', 'Dispense Successful');
+
+                            // Find item metadata for visual
+                            let itemMeta = null;
+                            newLayout.rows.forEach(r => {
+                                const found = r.slots.find(s => s.id === targetId);
+                                if (found) itemMeta = found;
+                            });
+
+                            if (itemMeta) {
+                                setDispensedItem({ ...itemMeta, timestamp: Date.now() });
+                                addLog('EVENT', `Visual: Item ${itemMeta.name} dropped`);
+                                addLog('EVENT', 'Machine Blocked until Pickup');
+                            }
+                            // Reset message
+                            setMessage(newStatus.balance > 0 ? `Credit: $${newStatus.balance.toFixed(2)}` : "Welcome");
+
+                        } else {
+                            // FAILURE: Count didn't drop (JAM)
+                            addLog('ERROR', 'Dispense Check Failed: Inventory unchanged');
+                            addLog('ERROR', 'STATUS: JAMMED');
+                            addLog('EVENT', 'Refund Initiated (Escrow returned)');
+
+                            setMessage("Error: Jammed");
+                            // We probably got a refund in the backend, balance update handles it
+                            setTimeout(() => setMessage(newStatus.balance > 0 ? `Credit: $${newStatus.balance.toFixed(2)}` : "Welcome"), 3000);
+                        }
+
+                        pendingSlotIdRef.current = null;
+                    }
+                }
+
                 lastStatusRef.current = machineStatus;
             }
 
-            // Update message based on status if busy
-            if (machineStatus === 'VENDING') {
-                setMessage("Dispensing...");
-                setLoading(true);
-            } else if (loading && machineStatus === 'IDLE') {
-                // Just finished transition from VENDING -> IDLE
-                setLoading(false);
-                // Check if we have a successful recent transaction? 
-                // For now, simple text, but main loop handles the item visual via local state in purchase
-            } else if (loading && machineStatus === 'ERROR') {
-                setLoading(false);
-                setMessage("Device Error");
-                addLog('ERROR', 'Machine reported hardware monitor error');
+            // Update inventory ref for next diff
+            if (newLayout) {
+                newLayout.rows.forEach(r => {
+                    r.slots.forEach(s => {
+                        lastInventoryRef.current[s.id] = s.count;
+                    });
+                });
             }
 
+            // 3. Ongoing Loading State Logic (if missed transition or just polling)
+            if (machineStatus === 'VENDING' && !loading) {
+                setMessage("Dispensing...");
+                setLoading(true);
+            }
+            // Safe guard if we are loading but backend is IDLE and we missed the exact frame transition? 
+            // The logic above handles the transition edge.
+            // But if we reload page while vending?
+            // For now, relies on the edge.
+
         } catch (err) {
-            // console.error("Failed to fetch state", err);
+            // console.error(err);
         }
     }, [loading, addLog]);
 
@@ -65,6 +150,7 @@ export const useMachine = () => {
 
     const insertMoney = async (amount) => {
         try {
+            addLog('USER', `Inserted $${amount}`);
             addLog('API_REQ', `POST /pay { amount: ${amount} }`);
             const res = await axios.post(`${API_URL}/machine/pay`, { amount });
             addLog('API_RES', `Balance updated: ${res.data.balance}`);
@@ -77,39 +163,29 @@ export const useMachine = () => {
     };
 
     const selectItem = async (slotId) => {
+        if (dispensedItem) {
+            setMessage("Remove Item First!");
+            addLog('USER', `Blocked purchase attempt on ${slotId} (Item in Box)`);
+            setTimeout(() => setMessage("Welcome"), 2000);
+            return;
+        }
+
         try {
             setLoading(true);
             setMessage("Processing...");
             addLog('USER', `Selected Slot ${slotId}`);
-            addLog('API_REQ', `POST /buy { slotId: ${slotId} }`);
+            pendingSlotIdRef.current = slotId; // Mark what we are waiting for
 
+            addLog('API_REQ', `POST /buy { slotId: ${slotId} }`);
             const res = await axios.post(`${API_URL}/machine/buy`, { slotId });
             addLog('API_RES', `Purchase Accepted: ${res.data.status}`);
 
-            // Speculative success for visual if we trust it will work? 
-            // No, we wait for poll? 
-            // Actually, for the visual "drop", we can set it here if we assume success, 
-            // OR we can rely on the fact that if it comes back to IDLE and stock dropped. 
-            // Simpler: Set it now as "Pending Drop" or just wait.
-            // Let's set it after a timeout matching the estimated time, or just set it on success if we want purely optimistic?
-            // Since backend is async, we don't know the result yet.
-            // But for better UX, we'll set it when the polling *confirms* the stock drop? 
-            // Complex. Let's just set it "Optimistically" after the estimated delay if no error?
-
-            // Better approach: We can query /history? No.
-            // Let's just use the fact we asked for it. 
-            const item = inventory.find(i => i.id === slotId);
-
-            // We will set a timeout to "show" the item roughly when it should be done (4s)
-            setTimeout(() => {
-                // Verify we didn't error out? We rely on polling.
-                // But let's show the item for visual feedback.
-                setDispensedItem({ ...item, timestamp: Date.now() });
-                addLog('EVENT', `Visual: Item ${item.name} dropped`);
-            }, 3500);
+            // REMOVED: Optimistic setTimeout from here. 
+            // Now handled in refreshState by inventory diff.
 
         } catch (err) {
             setLoading(false);
+            pendingSlotIdRef.current = null;
             addLog('ERROR', `Purchase Failed: ${err.response?.data?.error || err.message}`);
             if (err.response) {
                 setMessage(err.response.data.error === "Insufficient funds"
@@ -118,19 +194,24 @@ export const useMachine = () => {
             } else {
                 setMessage("System Error");
             }
-            setTimeout(() => setMessage("Welcome"), 3000);
+            setTimeout(() => setMessage(newStatus.balance > 0 ? `Credit: $${newStatus.balance.toFixed(2)}` : "Welcome"), 3000);
         }
     };
 
-    const clearDispensedItem = () => setDispensedItem(null);
+    const clearDispensedItem = () => {
+        addLog('USER', `Collected Item: ${dispensedItem?.name}`);
+        setDispensedItem(null);
+    };
 
     const returnChange = async () => {
         try {
+            addLog('USER', 'Requested Refund');
             addLog('API_REQ', 'POST /refund');
             await axios.post(`${API_URL}/machine/refund`);
             addLog('API_RES', 'Refund processed');
             setBalance(0);
             setMessage("Change Returned");
+            setTimeout(() => setMessage("Welcome"), 3000);
         } catch (err) {
             console.error(err);
         }
@@ -154,7 +235,7 @@ export const useMachine = () => {
     };
 
     return {
-        inventory,
+        layout,
         status,
         balance,
         message,

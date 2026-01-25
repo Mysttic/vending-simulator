@@ -1,4 +1,26 @@
+const layoutConfig = require('../config/machine-layout.json');
 const defaultInventory = require('../config/default-inventory');
+
+// ... (existing imports)
+
+const getLayout = (req, res) => {
+    // Merge static layout with dynamic inventory counts
+    const dynamicLayout = {
+        ...layoutConfig,
+        rows: layoutConfig.rows.map(row => ({
+            ...row,
+            slots: row.slots.map(slot => {
+                const liveItem = inventory.find(i => i.id === slot.id);
+                return {
+                    ...slot,
+                    // Use live count if available, otherwise fallback (should match)
+                    count: liveItem ? liveItem.count : 0
+                };
+            })
+        }))
+    };
+    res.json(dynamicLayout);
+};
 const eventBus = require('../services/event-bus');
 const webhookClient = require('../services/webhook-client');
 
@@ -83,6 +105,10 @@ const purchaseItem = async (req, res) => {
     // Start Transaction
     machineStatus = "VENDING";
 
+    // Deduct Balance Immediately (Escrow)
+    balance -= slot.price;
+    balance = parseFloat(balance.toFixed(2));
+
     // Respond immediately saying we started
     res.json({
         success: true,
@@ -96,9 +122,7 @@ const purchaseItem = async (req, res) => {
         const result = await simulateDispenseProcess(slot);
 
         if (result.success) {
-            // Finalize Sale
-            balance -= slot.price;
-            balance = parseFloat(balance.toFixed(2));
+            // Finalize Sale (Stock deduction)
             slot.count--;
 
             const transaction = {
@@ -115,7 +139,10 @@ const purchaseItem = async (req, res) => {
                 eventBus.emit('LOW_STOCK', { slotId: slot.id, count: slot.count });
             }
         } else {
-            // Handle Failure (Refund not needed as we didn't deduct yet, but we inform WMS)
+            // Handle Failure: REFUND ESCROW
+            balance += slot.price;
+            balance = parseFloat(balance.toFixed(2));
+
             eventBus.emit('DISPENSE_FAILURE', {
                 slotId: slot.id,
                 productId: slot.name,
@@ -125,6 +152,9 @@ const purchaseItem = async (req, res) => {
         }
     } catch (error) {
         console.error("Dispense Error", error);
+        // Safety Refund
+        balance += slot.price;
+        balance = parseFloat(balance.toFixed(2));
     } finally {
         machineStatus = "IDLE";
     }
@@ -151,6 +181,7 @@ const restockSlot = (req, res) => {
 };
 
 module.exports = {
+    getLayout,
     getInventory,
     getStatus,
     updateConfiguration,

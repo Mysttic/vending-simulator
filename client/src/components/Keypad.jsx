@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
+import { useLogs } from '../contexts/LogContext';
 
 export const ControlPanel = ({ message, balance, dispensedItem, onClearItem, onInsertMoney, onSelectSlot, onRefund }) => {
     const [input, setInput] = useState("");
+    const { addLog } = useLogs();
 
-    // Auto-clear dispensed item after 5s (configurable in future, now hardcoded as requested default)
-    useEffect(() => {
-        if (dispensedItem) {
-            const timer = setTimeout(() => {
-                onClearItem();
-            }, 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [dispensedItem, onClearItem]);
+    // Manual Pickup Only - Timer Removed as per user request (or increased indefinitely)
+    // We rely on onClearItem being called manually.
 
     const handleKey = (k) => {
+        addLog('USER', `Pressed Key '${k}'`);
         if (k === 'C') {
             setInput("");
             return;
@@ -25,6 +21,21 @@ export const ControlPanel = ({ message, balance, dispensedItem, onClearItem, onI
             return;
         }
         if (input.length < 2) setInput(prev => prev + k);
+    };
+
+    const handleMoney = (amount) => {
+        // Logic handled in hook, but we can log user intention here too or rely on hook
+        // Hook logs "Inserted $X"
+        onInsertMoney(amount);
+    };
+
+    const handlePickup = () => {
+        if (dispensedItem) {
+            addLog('USER', 'Clicked Pickup Box');
+            onClearItem();
+        } else {
+            addLog('USER', 'Clicked Empty Pickup Box');
+        }
     };
 
     return (
@@ -47,13 +58,13 @@ export const ControlPanel = ({ message, balance, dispensedItem, onClearItem, onI
 
             {/* Payment Simulation */}
             <div className="grid grid-cols-2 gap-2 bg-gray-900/50 p-2 rounded border border-white/5">
-                <button onClick={() => onInsertMoney(0.25)} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors shadow-inner flex items-center justify-center gap-1">
+                <button onClick={() => handleMoney(0.25)} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors shadow-inner flex items-center justify-center gap-1">
                     <div className="w-3 h-3 rounded-full bg-gray-400 border border-gray-300"></div> $0.25
                 </button>
-                <button onClick={() => onInsertMoney(1.00)} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors shadow-inner flex items-center justify-center gap-1">
+                <button onClick={() => handleMoney(1.00)} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors shadow-inner flex items-center justify-center gap-1">
                     <div className="w-3 h-3 rounded-full bg-yellow-500 border border-yellow-300"></div> $1.00
                 </button>
-                <button onClick={() => onInsertMoney(5.00)} className="col-span-2 px-2 py-1 bg-green-800 hover:bg-green-700 rounded text-xs text-white transition-colors shadow-inner border border-green-600/50">
+                <button onClick={() => handleMoney(5.00)} className="col-span-2 px-2 py-1 bg-green-800 hover:bg-green-700 rounded text-xs text-white transition-colors shadow-inner border border-green-600/50">
                     Insert $5 Bill
                 </button>
             </div>
@@ -84,22 +95,27 @@ export const ControlPanel = ({ message, balance, dispensedItem, onClearItem, onI
                 RETURN CHANGE
             </button>
 
-            <div className="mt-8 mx-auto w-32 h-24 bg-black rounded-t-lg border-x-4 border-t-4 border-gray-700 relative shadow-inner flex items-end justify-center pb-2 overflow-hidden">
+            <div
+                onClick={handlePickup}
+                className="mt-8 mx-auto w-32 h-24 bg-black rounded-t-lg border-x-4 border-t-4 border-gray-700 relative shadow-inner flex items-end justify-center pb-2 overflow-hidden cursor-pointer active:scale-95 transition-transform"
+            >
                 {/* Pickup Box */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     {dispensedItem ? (
                         <div className="animate-bounce flex flex-col items-center">
-                            <div className={clsx(
-                                "w-12 h-20 rounded shadow-lg rotate-12 transition-transform",
-                                dispensedItem.name.includes("Cola") ? "bg-red-600" :
-                                    dispensedItem.name.includes("Water") ? "bg-blue-400/50 backdrop-blur" :
-                                        "bg-yellow-500"
-                            )}>
+                            <div
+                                className={clsx(
+                                    "rounded shadow-lg rotate-12 transition-transform",
+                                    // Dynamic sizing based on type if passed, but assume standard for physics simulation
+                                    "w-12 h-20"
+                                )}
+                                style={{ backgroundColor: dispensedItem.color || 'red' }}
+                            >
                                 <div className="w-full h-full flex items-center justify-center text-[8px] text-white/80 font-bold -rotate-90">
                                     {dispensedItem.name}
                                 </div>
                             </div>
-                            <span className="text-[9px] text-green-400 bg-black/50 px-1 rounded mt-1">Ready!</span>
+                            <span className="text-[9px] text-green-400 bg-black/50 px-1 rounded mt-1">Click to Pickup</span>
                         </div>
                     ) : (
                         <div className="text-[10px] text-gray-600">PUSH</div>

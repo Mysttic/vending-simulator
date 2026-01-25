@@ -1,29 +1,37 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import { Package } from 'lucide-react';
+import { useLogs } from '../contexts/LogContext';
 
-export const Shelf = ({ slot, onSelect }) => {
+export const Shelf = ({ slot, height, onSelect }) => {
+    const { addLog } = useLogs();
     const isOut = slot.count === 0;
+
+    const handleClick = () => {
+        addLog('USER', `Clicked Shelf ${slot.id} (${slot.name})`);
+        if (!isOut) onSelect(slot.id);
+    };
 
     return (
         <div
-            onClick={() => !isOut && onSelect(slot.id)}
+            onClick={handleClick}
             className={clsx(
-                "relative flex flex-col items-center justify-end p-2 h-32 w-24 bg-gray-900/50 rounded-lg border border-white/10 shadow-inner group transition-all duration-300",
+                "relative flex flex-col items-center justify-end p-2 w-24 bg-gray-900/50 rounded-lg border border-white/10 shadow-inner group transition-all duration-300",
+                height === 'tall' ? "h-48" : "h-32",
                 !isOut && "cursor-pointer hover:bg-white/5 hover:border-blue-400/50 hover:scale-105",
                 isOut && "opacity-50 grayscale"
             )}
         >
             <div className="absolute top-2 left-2 text-xs font-mono text-gray-400">{slot.id}</div>
             <div className="flex-1 flex items-center justify-center">
-                {/* Placeholder for Product Image */}
-                <div className={clsx(
-                    "w-12 h-20 rounded shadow-lg transition-transform",
-                    slot.name.includes("Cola") ? "bg-red-600" :
-                        slot.name.includes("Water") ? "bg-blue-400/50 backdrop-blur" :
-                            "bg-yellow-500"
-                )}>
-                    <div className="w-full h-full flex items-center justify-center text-[8px] text-white/80 font-bold -rotate-90">
+                {/* Product Image Placeholder */}
+                <div
+                    className={clsx(
+                        "rounded shadow-lg transition-transform",
+                        height === 'tall' ? "w-12 h-32" : "w-12 h-20"
+                    )}
+                    style={{ backgroundColor: slot.color || '#666' }}
+                >
+                    <div className="w-full h-full flex items-center justify-center text-[8px] text-white/90 font-bold -rotate-90">
                         {slot.name}
                     </div>
                 </div>
