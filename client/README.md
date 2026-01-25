@@ -18,7 +18,7 @@ The application will launch on `http://localhost:5173`.
 
 ### 1. Main Interface
 The user interface mimics a physical machine.
-- **Top:** "SNACK TRON" Branding.
+- **Top:** "MYSTTIC VENDING" Branding.
 - **Center:** Glass window showing products with real-time stock levels. Empty slots are visually dimmed.
 - **Right:** Control Panel (LCD Display, Coin Slots, Keypad).
 - **Bottom:** Collapsible **Debug Logs** panel.

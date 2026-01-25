@@ -28,8 +28,8 @@ export const VendingMachine = () => {
                 {/* Top Logo Panel */}
                 <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-r from-blue-900 to-purple-900 rounded-t-xl z-0 mx-4 mt-3 flex items-center justify-center shadow-lg border-b border-white/10">
                     <h1 className="text-2xl font-black text-white tracking-widest uppercase italic drop-shadow-md opacity-90">
-                        SNACK <span className="text-blue-400">TRON</span> <span className="text-xs align-top font-normal bg-white/20 px-1 rounded ml-1">v2.0</span>
-                    </h1>
+                MYSTTIC <span className="text-blue-400">VENDING</span> <span className="text-xs align-top font-normal bg-white/20 px-1 rounded ml-1">v2.0</span>
+            </h1>
                 </div>
 
                 {/* Glass Window Area */}
