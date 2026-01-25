@@ -89,46 +89,13 @@ By default, the server runs on `http://localhost:3000`.
 
 ## 🔌 API Reference
 
-### Base URL
-`http://localhost:3000/api/v1`
+For detailed documentation of all endpoints, message formats, and payload examples, please refer to [**API_DOCS.md**](./API_DOCS.md).
 
-### 1. External Integration (WMS)
-
-#### Get Inventory
-Returns the full status of all slots in the machine.
-*   **Endpoint:** `GET /inventory`
-*   **Response:**
-    ```json
-    {
-      "data": [
-        {
-          "id": "11",
-          "name": "Cola Classic",
-          "price": 2.5,
-          "count": 10
-        }
-      ]
-    }
-    ```
-
-#### Check Machine Status
-Health check and configuration status.
-*   **Endpoint:** `GET /status`
-*   **Response:**
-    ```json
-    {
-      "machine_id": "VM-SIM-001",
-      "status": "IDLE",
-      "balance": 0,
-      "webhook_configured": true
-    }
-    ```
-
-#### Remote Restock (PATCH)
-Simulates a technician or robotic arm refilling a specific slot.
-*   **Endpoint:** `PATCH /inventory/:slotId`
-*   **Body:** `{ "count": 15 }`
-*   **Response:** `{ "success": true, "slot": { ... } }`
+### Quick Reference (Base URL: `http://localhost:3000/api/v1`)
+*   `GET /inventory` - Get all products.
+*   `GET /layout` - Get physical configuration.
+*   `GET /status` - Check health/balance.
+*   `PATCH /inventory/:id` - Restock slot.
 
 ---
 
