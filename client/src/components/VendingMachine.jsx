@@ -13,7 +13,9 @@ export const VendingMachine = () => {
         insertMoney,
         selectItem,
         returnChange,
-        updateConfig
+        updateConfig,
+        dispensedItem,
+        clearDispensedItem
     } = useMachine();
 
     // Group inventory by rows (1, 2, 3)
@@ -21,7 +23,9 @@ export const VendingMachine = () => {
     const getRowItems = (rowPrefix) => inventory.filter(i => i.id.startsWith(rowPrefix));
 
     return (
-        <div className="min-h-screen bg-gray-950 flex items-center justify-center p-8">
+        <div className="min-h-screen bg-gray-950 flex items-center justify-center p-8 relative">
+            {/* Settings Button moved to absolutely top-right via CSS in component itself */}
+            <SettingsPanel status={status} onSave={updateConfig} />
 
             {/* Machine Cabinet */}
             <div className="relative bg-gray-900 md:bg-[#1a1c23] p-4 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.8)] border-[12px] border-gray-800 flex flex-col md:flex-row gap-6 max-w-5xl w-full">
@@ -29,7 +33,7 @@ export const VendingMachine = () => {
                 {/* Top Logo Panel */}
                 <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-r from-blue-900 to-purple-900 rounded-t-xl z-0 mx-4 mt-3 flex items-center justify-center shadow-lg border-b border-white/10">
                     <h1 className="text-2xl font-black text-white tracking-widest uppercase italic drop-shadow-md opacity-90">
-                        SNACK <span className="text-blue-400">TRON</span> <span className="text-xs align-top font-normal bg-white/20 px-1 rounded ml-1">v1.1</span>
+                        SNACK <span className="text-blue-400">TRON</span> <span className="text-xs align-top font-normal bg-white/20 px-1 rounded ml-1">v1.2</span>
                     </h1>
                 </div>
 
@@ -54,6 +58,8 @@ export const VendingMachine = () => {
                     <ControlPanel
                         message={message}
                         balance={balance}
+                        dispensedItem={dispensedItem}
+                        onClearItem={clearDispensedItem}
                         onInsertMoney={insertMoney}
                         onSelectSlot={selectItem}
                         onRefund={returnChange}
@@ -61,8 +67,6 @@ export const VendingMachine = () => {
                 </div>
 
             </div>
-
-            <SettingsPanel status={status} onSave={updateConfig} />
         </div>
     );
 };

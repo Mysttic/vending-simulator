@@ -6,12 +6,13 @@ const webhookClient = require('../services/webhook-client');
 let inventory = JSON.parse(JSON.stringify(defaultInventory));
 let balance = 0.00;
 let machineStatus = "IDLE"; // IDLE, VENDING, ERROR
-let transactions = [];
+let failRate = 0.05; // 5% jam chance
 
 // Initialize Webhook Client listeners
-eventBus.on('SALE', (data) => webhookClient.sendEvent('SALE', data));
+// Updated events
+eventBus.on('DISPENSE_SUCCESS', (data) => webhookClient.sendEvent('DISPENSE_SUCCESS', data));
+eventBus.on('DISPENSE_FAILURE', (data) => webhookClient.sendEvent('DISPENSE_FAILURE', data));
 eventBus.on('LOW_STOCK', (data) => webhookClient.sendEvent('LOW_STOCK', data));
-eventBus.on('ERROR', (data) => webhookClient.sendEvent('MACHINE_ERROR', data));
 
 const getInventory = (req, res) => {
     res.json({ data: inventory });
@@ -22,14 +23,17 @@ const getStatus = (req, res) => {
         machine_id: "VM-SIM-001",
         status: machineStatus,
         balance: balance,
-        door_open: false, // Simulating closed door
+        fail_rate: failRate,
         webhook_configured: !!webhookClient.config.url
     });
 };
 
 const updateConfiguration = (req, res) => {
-    const { webhook_url, api_key } = req.body;
-    webhookClient.updateConfig(webhook_url, api_key);
+    const { webhook_url, api_key, fail_rate } = req.body;
+
+    if (webhook_url) webhookClient.updateConfig(webhook_url, api_key);
+    if (fail_rate !== undefined) failRate = parseFloat(fail_rate);
+
     res.json({ success: true, message: "Configuration updated" });
 };
 
@@ -38,62 +42,101 @@ const insertMoney = (req, res) => {
     if (!amount || amount <= 0) return res.status(400).json({ error: "Invalid amount" });
 
     balance += parseFloat(amount);
-    res.json({ success: true, balance: parseFloat(balance.toFixed(2)) });
+    // Fix js float issues
+    balance = parseFloat(balance.toFixed(2));
+
+    res.json({ success: true, balance });
 };
 
-const purchaseItem = (req, res) => {
-    const { slotId } = req.body;
-    const slotIndex = inventory.findIndex(s => s.id === slotId);
+const simulateDispenseProcess = (slot, transactionId) => {
+    return new Promise((resolve) => {
+        // Simulate motor mechanics delay (3-5s)
+        const delay = 3000 + Math.random() * 2000;
 
-    if (slotIndex === -1) {
-        return res.status(404).json({ error: "Slot not found" });
+        setTimeout(() => {
+            // Check for simulated failure
+            const isJam = Math.random() < failRate;
+
+            if (isJam) {
+                resolve({ success: false, reason: "JAMMED" });
+            } else {
+                resolve({ success: true });
+            }
+        }, delay);
+    });
+};
+
+const purchaseItem = async (req, res) => {
+    const { slotId } = req.body;
+
+    if (machineStatus !== 'IDLE') {
+        return res.status(503).json({ error: "Machine is busy", status: machineStatus });
     }
+
+    const slotIndex = inventory.findIndex(s => s.id === slotId);
+    if (slotIndex === -1) return res.status(404).json({ error: "Slot not found" });
 
     const slot = inventory[slotIndex];
+    if (slot.count <= 0) return res.status(400).json({ error: "Out of stock" });
+    if (balance < slot.price) return res.status(402).json({ error: "Insufficient funds", required: slot.price, current: balance });
 
-    if (slot.count <= 0) {
-        return res.status(400).json({ error: "Out of stock" });
+    // Start Transaction
+    machineStatus = "VENDING";
+
+    // Respond immediately saying we started
+    res.json({
+        success: true,
+        status: "PROCESSING",
+        message: "Dispensing...",
+        estimated_time_ms: 4000
+    });
+
+    // Async Logic
+    try {
+        const result = await simulateDispenseProcess(slot);
+
+        if (result.success) {
+            // Finalize Sale
+            balance -= slot.price;
+            balance = parseFloat(balance.toFixed(2));
+            slot.count--;
+
+            const transaction = {
+                id: Date.now().toString(),
+                slotId: slot.id,
+                productId: slot.name,
+                price: slot.price,
+                timestamp: new Date().toISOString()
+            };
+
+            eventBus.emit('DISPENSE_SUCCESS', { ...transaction, remaining_stock: slot.count });
+
+            if (slot.count <= 2) {
+                eventBus.emit('LOW_STOCK', { slotId: slot.id, count: slot.count });
+            }
+        } else {
+            // Handle Failure (Refund not needed as we didn't deduct yet, but we inform WMS)
+            eventBus.emit('DISPENSE_FAILURE', {
+                slotId: slot.id,
+                productId: slot.name,
+                reason: result.reason,
+                timestamp: new Date().toISOString()
+            });
+        }
+    } catch (error) {
+        console.error("Dispense Error", error);
+    } finally {
+        machineStatus = "IDLE";
     }
-
-    if (balance < slot.price) {
-        return res.status(402).json({ error: "Insufficient funds", required: slot.price, current: balance });
-    }
-
-    // Execute Sale
-    balance -= slot.price;
-    balance = parseFloat(balance.toFixed(2));
-    slot.count--;
-
-    const transaction = {
-        id: Date.now().toString(),
-        slotId: slot.id,
-        productId: slot.name,
-        price: slot.price,
-        timestamp: new Date().toISOString()
-    };
-    transactions.push(transaction);
-
-    // Emit Events
-    eventBus.emit('SALE', { ...transaction, remaining_stock: slot.count });
-
-    if (slot.count <= 2) {
-        eventBus.emit('LOW_STOCK', { slotId: slot.id, count: slot.count });
-    }
-
-    res.json({ success: true, dispensed: slot, change: balance });
-
-    // Reset balance after success (simulating change return or just consumption)
-    // Real machines might hold credit, but for sim purposes we can say it returns change immediately or keeps it.
-    // Let's keep it for multiple purchases unless user requests change.
 };
 
 const returnChange = (req, res) => {
+    if (machineStatus !== 'IDLE') return res.status(503).json({ error: "Machine busy" });
     const change = balance;
     balance = 0;
     res.json({ success: true, returned: change });
 };
 
-// Admin / Remote WMS functions
 const restockSlot = (req, res) => {
     const { slotId } = req.params;
     const { count } = req.body;

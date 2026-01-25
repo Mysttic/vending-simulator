@@ -21,6 +21,7 @@ The user interface mimics a physical machine.
 - **Top:** "SNACK TRON" Branding.
 - **Center:** Glass window showing products with real-time stock levels. Empty slots are visually dimmed.
 - **Right:** Control Panel (LCD Display, Coin Slots, Keypad).
+- **Bottom:** Collapsible **Debug Logs** panel.
 
 ![Main Interface](images/main_interface.png)
 
@@ -29,14 +30,15 @@ The simulation flow supports a realistic vending cycle:
 1.  **Insert Credit:** Click the `$0.25`, `$1.00`, or `$5.00` buttons.
 2.  **Select Product:** Use the keypad to type the Slot ID (e.g., `11`, `23`).
 3.  **Vending:** The machine processes the order, deduces stock, and returns a success message.
+4.  **Visual Drop:** The dispensed product appears in the bottom "Pickup Box" for 5 seconds before being collected.
 
 ![Vending Process](images/vending_status.png)
 
 ### 3. WMS Configuration Panel
-Access the hidden settings menu by clicking the **Gear Icon** in the bottom-right corner.
+Access the hidden settings menu by clicking the **Gear Icon** in the **Top-Right** corner.
 Use this panel to "hot-swap" the integration endpoint without restarting the server.
 - **Webhook URL:** The destination for event notifications (e.g., [webhook.site](https://webhook.site)).
-- **API Key:** Optional security header included in outgoing requests.
+- **Simulated Failure Rate:** Adjust the slider/input to simulate jam probability (0.0 to 1.0).
 
 ![Settings Panel](images/settings_panel.png)
 

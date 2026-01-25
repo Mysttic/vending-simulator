@@ -1,13 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, Save, X } from 'lucide-react';
 
 export const SettingsPanel = ({ status, onSave }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [url, setUrl] = useState("");
     const [apiKey, setApiKey] = useState("");
+    const [failRate, setFailRate] = useState(0.05);
+
+    useEffect(() => {
+        if (status && !url) {
+            // Init state from status if available (tho status doesn't echo URL for security usually, but we check configured)
+            // fail_rate is public in status
+            if (status.fail_rate !== undefined) setFailRate(status.fail_rate);
+        }
+    }, [status, url]);
 
     const handleSave = () => {
-        onSave(url, apiKey).then(success => {
+        onSave(url, apiKey, failRate).then(success => {
             if (success) setIsOpen(false);
         });
     };
@@ -16,7 +25,7 @@ export const SettingsPanel = ({ status, onSave }) => {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-4 right-4 p-2 bg-gray-800 text-gray-400 hover:text-white rounded-full transition-colors z-50 hover:rotate-90 duration-500"
+                className="fixed top-4 right-4 p-2 bg-gray-800 text-gray-400 hover:text-white rounded-full transition-colors z-50 hover:rotate-90 duration-500 shadow-xl border border-gray-600"
             >
                 <Settings size={20} />
             </button>
@@ -57,11 +66,30 @@ export const SettingsPanel = ({ status, onSave }) => {
                         />
                     </div>
 
+                    <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1">Simulated Failure Rate (0.0 - 1.0)</label>
+                        <div className="flex gap-2">
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="1"
+                                value={failRate}
+                                onChange={e => setFailRate(Math.min(1, Math.max(0, parseFloat(e.target.value))))}
+                                className="w-24 bg-gray-950 border border-gray-800 rounded p-2 text-sm text-white focus:border-blue-500 outline-none"
+                            />
+                            <div className="text-xs text-gray-500 flex items-center">
+                                Set to 1.0 to force Jams.
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="p-3 bg-blue-900/20 border border-blue-500/20 rounded text-xs text-blue-200">
                         <p className="font-bold mb-1">Current Status:</p>
                         <p>Machine ID: {status?.machine_id}</p>
                         <p>Status: {status?.status}</p>
                         <p>Integration: <span className={status?.webhook_configured ? "text-green-400" : "text-gray-500"}>{status?.webhook_configured ? "Active" : "Not Configured"}</span></p>
+                        <p>Fail Rate: {(status?.fail_rate * 100).toFixed(0)}%</p>
                     </div>
 
                     <button

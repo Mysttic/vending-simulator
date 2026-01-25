@@ -1,7 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { clsx } from 'clsx';
 
-export const ControlPanel = ({ message, balance, onInsertMoney, onSelectSlot, onRefund }) => {
+export const ControlPanel = ({ message, balance, dispensedItem, onClearItem, onInsertMoney, onSelectSlot, onRefund }) => {
     const [input, setInput] = useState("");
+
+    // Auto-clear dispensed item after 5s (configurable in future, now hardcoded as requested default)
+    useEffect(() => {
+        if (dispensedItem) {
+            const timer = setTimeout(() => {
+                onClearItem();
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [dispensedItem, onClearItem]);
 
     const handleKey = (k) => {
         if (k === 'C') {
@@ -73,9 +84,27 @@ export const ControlPanel = ({ message, balance, onInsertMoney, onSelectSlot, on
                 RETURN CHANGE
             </button>
 
-            <div className="mt-8 mx-auto w-32 h-24 bg-black rounded-t-lg border-x-4 border-t-4 border-gray-700 relative shadow-inner flex items-end justify-center pb-2">
+            <div className="mt-8 mx-auto w-32 h-24 bg-black rounded-t-lg border-x-4 border-t-4 border-gray-700 relative shadow-inner flex items-end justify-center pb-2 overflow-hidden">
                 {/* Pickup Box */}
-                <div className="text-[10px] text-gray-600">PUSH</div>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    {dispensedItem ? (
+                        <div className="animate-bounce flex flex-col items-center">
+                            <div className={clsx(
+                                "w-12 h-20 rounded shadow-lg rotate-12 transition-transform",
+                                dispensedItem.name.includes("Cola") ? "bg-red-600" :
+                                    dispensedItem.name.includes("Water") ? "bg-blue-400/50 backdrop-blur" :
+                                        "bg-yellow-500"
+                            )}>
+                                <div className="w-full h-full flex items-center justify-center text-[8px] text-white/80 font-bold -rotate-90">
+                                    {dispensedItem.name}
+                                </div>
+                            </div>
+                            <span className="text-[9px] text-green-400 bg-black/50 px-1 rounded mt-1">Ready!</span>
+                        </div>
+                    ) : (
+                        <div className="text-[10px] text-gray-600">PUSH</div>
+                    )}
+                </div>
             </div>
         </div>
     );
