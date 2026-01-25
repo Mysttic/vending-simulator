@@ -42,6 +42,21 @@ Use this panel to "hot-swap" the integration endpoint without restarting the ser
 
 ![Settings Panel](images/settings_panel.png)
 
+## ⚙️ Simulation Logic
+
+### Visual Verification System
+The frontend simulates a physical "Drop Sensor" to confirm dispensing.
+1.  **Polling:** The client polls `/api/v1/layout` every second.
+2.  **Diff Check:** When a "VENDING" cycle completes, the client compares the *Old Inventory Count* vs the *New Inventory Count* for the selected slot.
+    *   **Count Decreased**: Confirmed Drop. The visual item animation plays.
+    *   **Count Unchanged**: Jam Detected. The machine goes into Error state, and **no item** is dispensed.
+
+### Manual Pickup
+To simulate real-world interaction:
+*   Items in the "Pickup Box" do not disappear automatically.
+*   **Action**: You must **click the item** to remove it.
+*   **Interlock**: You cannot purchase a new item until the previous one is collected.
+
 ## 🛠 Technology Stack
 *   **React 19**: Interactive UI library.
 *   **Vite**: Fast build tool and dev server.
