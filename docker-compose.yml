@@ -1,0 +1,26 @@
+services:
+  server:
+    build:
+      context: ./server
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+    networks:
+      - vending-network
+
+  client:
+    build:
+      context: ./client
+      args:
+        - VITE_API_URL=http://localhost:3000/api/v1
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    networks:
+      - vending-network
+
+networks:
+  vending-network:
+    driver: bridge
