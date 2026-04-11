@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test:*)",
+      "Bash(grep -E '\\\\.\\(js|json|yml|yaml|txt\\)$')",
+      "Bash(find /c/Workspaces/vending-simulator/server -type f -name \"*.js\" ! -path \"*/node_modules/*\" ! -path \"*/.git/*\" -exec echo \"=== {} ===\" \\\\; -exec wc -l {} \\\\;)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

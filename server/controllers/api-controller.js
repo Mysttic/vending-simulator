@@ -29,6 +29,7 @@ let inventory = JSON.parse(JSON.stringify(defaultInventory));
 let balance = 0.00;
 let machineStatus = "IDLE"; // IDLE, VENDING, ERROR
 let failRate = 0.05; // 5% jam chance
+let dispenseDelay = 3000; // ms; override via POST /api/v1/config for tests
 
 // Initialize Webhook Client listeners
 // Updated events
@@ -51,10 +52,11 @@ const getStatus = (req, res) => {
 };
 
 const updateConfiguration = (req, res) => {
-    const { webhook_url, api_key, fail_rate } = req.body;
+    const { webhook_url, api_key, fail_rate, dispense_delay_ms } = req.body;
 
     if (webhook_url) webhookClient.updateConfig(webhook_url, api_key);
     if (fail_rate !== undefined) failRate = parseFloat(fail_rate);
+    if (dispense_delay_ms !== undefined) dispenseDelay = parseInt(dispense_delay_ms, 10);
 
     res.json({ success: true, message: "Configuration updated" });
 };
@@ -70,21 +72,12 @@ const insertMoney = (req, res) => {
     res.json({ success: true, balance });
 };
 
-const simulateDispenseProcess = (slot, transactionId) => {
+const simulateDispenseProcess = (slot) => {
     return new Promise((resolve) => {
-        // Simulate motor mechanics delay (3-5s)
-        const delay = 3000 + Math.random() * 2000;
-
         setTimeout(() => {
-            // Check for simulated failure
             const isJam = Math.random() < failRate;
-
-            if (isJam) {
-                resolve({ success: false, reason: "JAMMED" });
-            } else {
-                resolve({ success: true });
-            }
-        }, delay);
+            resolve(isJam ? { success: false, reason: "JAMMED" } : { success: true });
+        }, dispenseDelay);
     });
 };
 
@@ -180,6 +173,15 @@ const restockSlot = (req, res) => {
     res.json({ success: true, slot });
 };
 
+const resetMachine = (req, res) => {
+    inventory = JSON.parse(JSON.stringify(defaultInventory));
+    balance = 0;
+    machineStatus = "IDLE";
+    failRate = 0.05;
+    dispenseDelay = 3000;
+    res.json({ success: true, message: "Machine reset to defaults" });
+};
+
 module.exports = {
     getLayout,
     getInventory,
@@ -188,5 +190,6 @@ module.exports = {
     insertMoney,
     purchaseItem,
     returnChange,
-    restockSlot
+    restockSlot,
+    resetMachine
 };

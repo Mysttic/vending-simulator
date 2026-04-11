@@ -29,10 +29,17 @@ app.post('/api/v1/machine/refund', apiController.returnChange);
 // WMS Operations
 app.patch('/api/v1/inventory/:slotId', apiController.restockSlot);
 
+// Test/Admin Operations
+app.post('/api/v1/machine/reset', apiController.resetMachine);
+
 // Health
 app.get('/health', (req, res) => res.send('OK'));
 
-app.listen(PORT, () => {
-    console.log(`Vending Machine Core running on http://localhost:${PORT}`);
-    console.log(`Ready to integrate with WMS.`);
-});
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Vending Machine Core running on http://localhost:${PORT}`);
+        console.log(`Ready to integrate with WMS.`);
+    });
+}
+
+module.exports = app;
