@@ -14,6 +14,11 @@ services:
       context: ./client
       args:
         - VITE_API_URL=http://localhost:3001/api/v1
+
+        # Logowanie do panelu: node scripts/ui-password-hash.cjs <login> <hasło>
+        - VITE_UI_USER=${UI_USER:-admin}
+        - VITE_UI_PASSWORD_HASH=${UI_PASSWORD_HASH:-}
+        - VITE_UI_IDLE_MINUTES=${UI_IDLE_MINUTES:-30}
     ports:
       - "81:80"
     depends_on:
