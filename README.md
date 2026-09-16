@@ -4,6 +4,47 @@ A comprehensive IoT simulation project designed for testing integrations with Wa
 
 ---
 
+## 🔐 Logowanie do panelu
+
+Panel otwiera się na ekranie logowania i przed zalogowaniem nie renderuje ani nie
+odpytuje niczego. Symulator bywa instalowany u klienta na stanowisku dostępnym
+dla osób nieuprawnionych i chodzi o to, żeby nikt postronny w nim nie klikał.
+
+| Zachowanie | Szczegóły |
+|---|---|
+| Domyślne poświadczenia | `admin` / `vending` |
+| Czas życia sesji | `sessionStorage` — zamknięcie karty kończy sesję |
+| Bezczynność | auto-wylogowanie po 30 minutach (`UI_IDLE_MINUTES`) |
+| Nieudane próby | 5 z rzędu blokuje formularz na 30 sekund |
+
+> **To blokada interfejsu, nie zabezpieczenie API.** Backend jest nietknięty —
+> endpointy odpowiadają dokładnie jak dotąd, więc automatyzacja, testy i kontrakt
+> integracji działają bez żadnego dodatkowego nagłówka.
+
+Własne hasło u klienta, bez zmiany kodu:
+
+```bash
+node scripts/ui-password-hash.cjs admin TwojeHaslo
+```
+
+Wynik wklej do `.env` obok `docker-compose.yml` (wzór: `.env.example`):
+
+```ini
+UI_USER=admin
+UI_PASSWORD_HASH=<hash z komendy wyżej>
+UI_IDLE_MINUTES=30
+```
+
+i przebuduj obraz UI:
+
+```bash
+docker compose up -d --build client
+```
+
+Przy pracy lokalnej (`npm run dev`) te same wartości podaje się z prefiksem
+`VITE_`, np. `VITE_UI_PASSWORD_HASH=... npm run dev`.
+
+
 ## 📸 System Showcase
 
 ### Main Interface
