@@ -1,18 +1,42 @@
 name: Integration Tests
 
+# Tests run for one case only: a pull request from `develop` into `master`
+# (plus a manual run). `push` and `release` used to fire the same suite on the
+# same code a second and third time; `main` never existed in this repository.
+#
+# NOTE: the `paths` filter below means that a pull request touching nothing
+# under it produces no workflow run at all, and therefore no check run. Before
+# making "Server Integration Tests" a required status check, either drop the
+# filter (the job-level `if` still reports a skipped check) or add an
+# unfiltered placeholder job, otherwise such a PR can never be merged.
+
 on:
-  push:
-    branches: [ master, main ]
   pull_request:
-    branches: [ master, main ]
-  release:
-    types: [ created ]
+    branches: [ master ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/integration-tests.yml'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   integration-tests:
     name: Server Integration Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # GitHub does not filter on the SOURCE branch in `on:` - `branches:` under
+    # `pull_request` only matches the TARGET branch. To run tests strictly from
+    # `develop`, the condition has to sit on the job. `github.head_ref` is empty
+    # on a manual run, hence the `workflow_dispatch` clause.
+    #
+    # A pull request into `master` from any other branch runs nothing: the job
+    # is skipped and GitHub reports the run as green. That is intended - CI is
+    # not supposed to start on other branches at all. A green check on such a
+    # pull request means "not run", not "tested".
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'develop'
 
     defaults:
       run:
@@ -33,13 +57,13 @@ jobs:
         run: npm ci
 
       - name: Run integration tests
-        run: npm test
+        run: npm run test:coverage
 
       - name: Upload coverage report
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: server/coverage/
-          if-no-files-found: ignore
+          if-no-files-found: warn
           retention-days: 7

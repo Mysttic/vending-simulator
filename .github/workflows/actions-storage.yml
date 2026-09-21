@@ -11,7 +11,7 @@ name: Actions storage
 
 on:
   schedule:
-    - cron: "40 3 * * *"
+    - cron: "40 3 * * 1,4"
   workflow_dispatch:
     inputs:
       artifact_days:
@@ -106,15 +106,12 @@ jobs:
             let logsSkipped = 0;
 
             if (logDays >= 0) {
+              // Runs come back newest first, so the ones old enough to sweep
+              // sit at the end of the list - every page has to be fetched
+              // before the age filter below can reach them.
               const runs = await github.paginate(
                 github.rest.actions.listWorkflowRunsForRepo,
-                { owner, repo, per_page: 100, status: 'completed' },
-                (response, done) => {
-                  // Runs come back newest first, so once a page is entirely
-                  // inside the window there is nothing older worth fetching.
-                  if (response.data.every(run => ageDays(run.created_at) < logDays)) done();
-                  return response.data;
-                }
+                { owner, repo, per_page: 100, status: 'completed' }
               );
 
               for (const run of runs) {
